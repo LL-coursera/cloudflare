@@ -14,8 +14,18 @@ const {
 	HarmBlockThreshold,
 } = require("@google/generative-ai");
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+}
+
 export default {
 	async fetch(request, env, ctx) {
+		// handle CORS preflight requests
+		if (request.method === 'OPTIONS') {
+			return new Response(null, { headers: corsHeaders })
+		}
 		function formatDate(date) {
 			const yyyy = date.getFullYear();
 			const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -53,13 +63,20 @@ export default {
 			}
 		}
 
+		const datain = await request.json();
+		// return new Response(JSON.stringify(datain));
+		// return new Response(datain, { headers: corsHeaders });
+		const url = `https://api.polygon.io/v2/aggs/ticker/${datain.ticker}/range/1/day/${dates.startDate}/${dates.endDate}?adjusted=true&sort=asc&apiKey=${env.POLYGON_API}`
 		const apiKey = env.GEMINI_API;
-		const url = `https://api.polygon.io/v2/aggs/ticker/SAVE/range/1/day/${dates.startDate}/${dates.endDate}?adjusted=true&sort=asc&apiKey=${env.POLYGON_API}`
-
-		const genAI = new GoogleGenerativeAI(apiKey);
+		
+		const cloudflareGatewayUrl = `https://gateway.ai.cloudflare.com/v1/f1883443a5ac867a686ab05466ec1510/gemini-gateway/google-ai-studio`
+		const genAI = new GoogleGenerativeAI(apiKey,{
+			baseUrl: cloudflareGatewayUrl
+		});
 
 		const model = genAI.getGenerativeModel({
 			model: "gemini-1.5-flash",
+			
 		});
 		const generationConfig = {
 			temperature: 1.1, // 0-2
@@ -82,7 +99,7 @@ export default {
 
 		// 	run(data)
 		// })
-		return new Response(result.response.text());
+		return new Response(result.response.text(), { headers: corsHeaders });
 	},
 
 };
